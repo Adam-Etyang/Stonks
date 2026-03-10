@@ -1,0 +1,43 @@
+is_global = true
+build_property.TargetFramework = net8.0
+build_property.TargetPlatformMinVersion = 
+build_property.UsingMicrosoftNETSdkWeb = true
+build_property.ProjectTypeGuids = 
+build_property.InvariantGlobalization = 
+build_property.PlatformNeutralAssembly = 
+build_property.EnforceExtendedAnalyzerRules = 
+build_property._SupportedPlatformList = Linux,macOS,Windows
+build_property.RootNamespace = stonks
+build_property.RootNamespace = stonks
+build_property.ProjectDir = /Users/adam/Projects/stonks/
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 
+build_property.RazorLangVersion = 8.0
+build_property.SupportLocalizedComponentNames = 
+build_property.GenerateRazorMetadataSourceChecksumAttributes = 
+build_property.MSBuildProjectDirectory = /Users/adam/Projects/stonks
+build_property._RazorSourceGeneratorDebug = 
+
+[/Users/adam/Projects/stonks/Client/App.razor]
+build_metadata.AdditionalFiles.TargetPath = Q2xpZW50L0FwcC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/adam/Projects/stonks/Client/Pages/Home.razor]
+build_metadata.AdditionalFiles.TargetPath = Q2xpZW50L1BhZ2VzL0hvbWUucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/adam/Projects/stonks/Client/Pages/Weather.razor]
+build_metadata.AdditionalFiles.TargetPath = Q2xpZW50L1BhZ2VzL1dlYXRoZXIucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/adam/Projects/stonks/Client/_Imports.razor]
+build_metadata.AdditionalFiles.TargetPath = Q2xpZW50L19JbXBvcnRzLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/adam/Projects/stonks/Client/Layout/MainLayout.razor]
+build_metadata.AdditionalFiles.TargetPath = Q2xpZW50L0xheW91dC9NYWluTGF5b3V0LnJhem9y
+build_metadata.AdditionalFiles.CssScope = b-8x435zt30q
+
+[/Users/adam/Projects/stonks/Client/Layout/NavMenu.razor]
+build_metadata.AdditionalFiles.TargetPath = Q2xpZW50L0xheW91dC9OYXZNZW51LnJhem9y
+build_metadata.AdditionalFiles.CssScope = b-gxc0zjc61q

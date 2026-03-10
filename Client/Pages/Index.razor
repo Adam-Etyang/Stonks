@@ -1,0 +1,516 @@
+@page "/"
+@using Client.Models
+@inject HttpClient Http
+
+<div class="terminal-bg">
+    <div class="scanlines"></div>
+
+    <header class="dashboard-header">
+        <div class="header-left">
+            <span class="logo-mark">▶</span>
+            <span class="logo-text">STONKS</span>
+            <span class="header-tag">MARKET DATA</span>
+        </div>
+        <div class="header-right">
+            <span class="live-dot"></span>
+            <span class="live-label">LIVE</span>
+            <span class="clock" id="clock"></span>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="search-section">
+            <div class="search-label">ENTER TICKER SYMBOL</div>
+            <div class="search-bar">
+                <span class="search-prefix">$</span>
+                <input
+                    @bind="ticker"
+                    @bind:event="oninput"
+                    @onkeypress="HandleKeyPress"
+                    placeholder="AAPL, MSFT, TSLA..."
+                    class="ticker-input"
+                    maxlength="10" />
+                <button @onclick="SearchStock" disabled="@isLoading" class="search-btn">
+                    @if (isLoading)
+                    {
+                        <span class="btn-spinner"></span>
+                        <span>LOADING</span>
+                    }
+                    else
+                    {
+                        <span>QUERY ↵</span>
+                    }
+                </button>
+            </div>
+            @if (errorMessage != null)
+            {
+                <div class="error-bar">
+                    <span class="error-icon">⚠</span>
+                    <span>@errorMessage</span>
+                </div>
+            }
+        </div>
+
+        @if (stock == null && errorMessage == null && !isLoading)
+        {
+            <div class="empty-state">
+                <div class="empty-grid">
+                    <div class="eg-item">DOW JONES</div>
+                    <div class="eg-item">S&amp;P 500</div>
+                    <div class="eg-item">NASDAQ</div>
+                    <div class="eg-item">RUSSELL 2000</div>
+                    <div class="eg-item">NYSE COMPOSITE</div>
+                    <div class="eg-item">VIX INDEX</div>
+                </div>
+                <p class="empty-hint">Search any ticker symbol to pull live market data</p>
+            </div>
+        }
+
+        @if (stock != null)
+        {
+            var priceChange = stock.CurrentPrice - stock.OpenPrice;
+            var priceChangePct = stock.OpenPrice > 0 ? (priceChange / stock.OpenPrice) * 100 : 0;
+            var isPositive = priceChange >= 0;
+            var changeClass = isPositive ? "positive" : "negative";
+            var changeSign = isPositive ? "+" : "";
+            var priceRangeWidth = stock.HighPrice - stock.LowPrice;
+            var currentPosInRange = priceRangeWidth > 0
+                ? ((stock.CurrentPrice - stock.LowPrice) / priceRangeWidth) * 100
+                : 50;
+
+            <div class="stock-panel @(isPositive ? "panel-positive" : "panel-negative")">
+
+                <!-- TOP BAR -->
+                <div class="panel-topbar">
+                    <div class="panel-ticker">@stock.Ticker</div>
+                    <div class="panel-company">@stock.CompanyName</div>
+                    <div class="panel-updated">UPDATED @stock.LastUpdated.ToString("MMM dd yyyy, HH:mm")</div>
+                </div>
+
+                <!-- PRICE HERO -->
+                <div class="price-hero">
+                    <div class="price-main">
+                        <span class="price-currency">USD</span>
+                        <span class="price-value">@stock.CurrentPrice.ToString("F2")</span>
+                    </div>
+                    <div class="price-change @changeClass">
+                        <span class="change-arrow">@(isPositive ? "▲" : "▼")</span>
+                        <span>@changeSign@priceChange.ToString("F2")</span>
+                        <span class="change-pct">(@changeSign@priceChangePct.ToString("F2")%)</span>
+                        <span class="change-label">vs OPEN</span>
+                    </div>
+                </div>
+
+                <!-- RANGE BAR -->
+                <div class="range-section">
+                    <div class="range-labels">
+                        <span class="range-lo">LO $@stock.LowPrice.ToString("F2")</span>
+                        <span class="range-title">TODAY'S RANGE</span>
+                        <span class="range-hi">HI $@stock.HighPrice.ToString("F2")</span>
+                    </div>
+                    <div class="range-track">
+                        <div class="range-fill" style="width: @currentPosInRange.ToString("F1")%"></div>
+                        <div class="range-cursor" style="left: calc(@currentPosInRange.ToString("F1")% - 6px)"></div>
+                    </div>
+                </div>
+
+                <!-- STATS GRID -->
+                <div class="stats-grid">
+                    <div class="stat-block">
+                        <div class="stat-label">OPEN</div>
+                        <div class="stat-value">$@stock.OpenPrice.ToString("F2")</div>
+                    </div>
+                    <div class="stat-block">
+                        <div class="stat-label">HIGH</div>
+                        <div class="stat-value positive">$@stock.HighPrice.ToString("F2")</div>
+                    </div>
+                    <div class="stat-block">
+                        <div class="stat-label">LOW</div>
+                        <div class="stat-value negative">$@stock.LowPrice.ToString("F2")</div>
+                    </div>
+                    <div class="stat-block">
+                        <div class="stat-label">VOLUME</div>
+                        <div class="stat-value">@FormatVolume(stock.Volume)</div>
+                    </div>
+                    <div class="stat-block">
+                        <div class="stat-label">MKT CAP EST</div>
+                        <div class="stat-value dim">—</div>
+                    </div>
+                    <div class="stat-block">
+                        <div class="stat-label">52W RANGE</div>
+                        <div class="stat-value dim">—</div>
+                    </div>
+                </div>
+
+                <!-- MINI SPARK CHART -->
+                <div class="chart-section">
+                    <div class="chart-label">INTRADAY SIMULATION (ILLUSTRATIVE)</div>
+                    <div class="chart-wrap">
+                        <svg class="spark-chart" viewBox="0 0 600 120" preserveAspectRatio="none">
+                            <defs>
+                                <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="@(isPositive ? "#00ff88" : "#ff4455")" stop-opacity="0.35"/>
+                                    <stop offset="100%" stop-color="@(isPositive ? "#00ff88" : "#ff4455")" stop-opacity="0"/>
+                                </linearGradient>
+                            </defs>
+                            @{
+                                var path = GenerateSparkPath(stock, isPositive);
+                                var areaPath = path.areaPath;
+                                var linePath = path.linePath;
+                                var color = isPositive ? "#00ff88" : "#ff4455";
+                            }
+                            <path d="@areaPath" fill="url(#sparkGrad)" />
+                            <path d="@linePath" fill="none" stroke="@color" stroke-width="2.5" stroke-linejoin="round"/>
+                        </svg>
+                        <div class="chart-axis">
+                            <span>09:30</span><span>11:00</span><span>12:30</span><span>14:00</span><span>15:30</span><span>16:00</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        }
+    </main>
+
+    <footer class="dashboard-footer">
+        <span>STONKS</span>
+        <span class="footer-sep">|</span>
+        <span>DATA MAY BE DELAYED 15 MIN</span>
+        <span class="footer-sep">|</span>
+        <span>NOT FINANCIAL ADVICE</span>
+    </footer>
+</div>
+
+<style>
+    @@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Bebas+Neue&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+        --bg:        #0a0c0f;
+        --surface:   #0f1318;
+        --border:    #1e2530;
+        --muted:     #3a4555;
+        --text:      #c8d4e0;
+        --dim:       #5a6a7a;
+        --amber:     #f0a500;
+        --green:     #00ff88;
+        --red:       #ff4455;
+        --blue:      #4488ff;
+        --font-mono: 'IBM Plex Mono', monospace;
+        --font-disp: 'Bebas Neue', sans-serif;
+    }
+
+    body, html { background: var(--bg); color: var(--text); font-family: var(--font-mono); }
+
+    /* TERMINAL BG */
+    .terminal-bg {
+        min-height: 100vh;
+        background: var(--bg);
+        background-image:
+            radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0,180,100,0.06) 0%, transparent 70%),
+            repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.012) 2px, rgba(255,255,255,0.012) 4px);
+        position: relative;
+        overflow: hidden;
+    }
+    .scanlines {
+        position: fixed; inset: 0; pointer-events: none; z-index: 999;
+        background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.09) 3px, rgba(0,0,0,0.09) 4px);
+    }
+
+    /* HEADER */
+    .dashboard-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 0.75rem 2rem;
+        border-bottom: 1px solid var(--border);
+        background: rgba(15,19,24,0.9);
+        backdrop-filter: blur(4px);
+    }
+    .header-left { display: flex; align-items: center; gap: 0.75rem; }
+    .logo-mark { color: var(--amber); font-size: 1.2rem; }
+    .logo-text { font-family: var(--font-disp); font-size: 1.5rem; letter-spacing: 4px; color: #fff; }
+    .header-tag {
+        font-size: 0.6rem; letter-spacing: 3px; color: var(--dim);
+        border: 1px solid var(--border); padding: 2px 8px; border-radius: 2px;
+    }
+    .header-right { display: flex; align-items: center; gap: 0.6rem; font-size: 0.75rem; color: var(--dim); }
+    .live-dot {
+        width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+        box-shadow: 0 0 8px var(--green);
+        animation: pulse 2s ease-in-out infinite;
+    }
+    .live-label { color: var(--green); font-size: 0.65rem; letter-spacing: 2px; }
+    .clock { color: var(--amber); font-size: 0.8rem; min-width: 80px; text-align: right; }
+    @@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* MAIN */
+    .main-content { max-width: 900px; margin: 0 auto; padding: 2.5rem 1.5rem; }
+
+    /* SEARCH */
+    .search-section { margin-bottom: 2.5rem; }
+    .search-label { font-size: 0.6rem; letter-spacing: 4px; color: var(--dim); margin-bottom: 0.75rem; }
+    .search-bar {
+        display: flex; align-items: center; gap: 0;
+        border: 1px solid var(--border); border-radius: 4px;
+        overflow: hidden; max-width: 560px;
+        transition: border-color 0.2s;
+    }
+    .search-bar:focus-within { border-color: var(--amber); box-shadow: 0 0 0 3px rgba(240,165,0,0.1); }
+    .search-prefix {
+        padding: 0 1rem; color: var(--amber); font-size: 1.1rem;
+        background: rgba(240,165,0,0.06); border-right: 1px solid var(--border);
+        height: 52px; display: flex; align-items: center;
+    }
+    .ticker-input {
+        flex: 1; background: var(--surface); border: none; outline: none;
+        color: #fff; font-family: var(--font-mono); font-size: 1.1rem; font-weight: 600;
+        padding: 0 1rem; height: 52px; letter-spacing: 2px;
+        text-transform: uppercase;
+    }
+    .ticker-input::placeholder { color: var(--muted); font-weight: 300; text-transform: none; letter-spacing: 0; }
+    .search-btn {
+        padding: 0 1.5rem; height: 52px; background: var(--amber); color: #000;
+        border: none; cursor: pointer; font-family: var(--font-mono); font-size: 0.75rem;
+        font-weight: 700; letter-spacing: 2px; transition: background 0.15s, opacity 0.15s;
+        display: flex; align-items: center; gap: 0.5rem; white-space: nowrap;
+    }
+    .search-btn:hover:not(:disabled) { background: #ffb820; }
+    .search-btn:disabled { background: var(--muted); cursor: not-allowed; color: var(--dim); }
+    .btn-spinner {
+        width: 12px; height: 12px; border: 2px solid rgba(0,0,0,0.3);
+        border-top-color: #000; border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @@keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-bar {
+        margin-top: 0.75rem; padding: 0.6rem 1rem;
+        background: rgba(255,68,85,0.1); border: 1px solid rgba(255,68,85,0.3);
+        border-radius: 4px; color: var(--red); font-size: 0.8rem;
+        display: flex; align-items: center; gap: 0.5rem; max-width: 560px;
+    }
+    .error-icon { font-size: 1rem; }
+
+    /* EMPTY STATE */
+    .empty-state { text-align: center; padding: 4rem 0; }
+    .empty-grid {
+        display: grid; grid-template-columns: repeat(3,1fr); gap: 1px;
+        max-width: 480px; margin: 0 auto 2rem; border: 1px solid var(--border);
+    }
+    .eg-item {
+        padding: 1rem; background: var(--surface); font-size: 0.65rem;
+        letter-spacing: 2px; color: var(--muted); transition: color 0.2s, background 0.2s;
+    }
+    .eg-item:hover { color: var(--amber); background: rgba(240,165,0,0.05); }
+    .empty-hint { font-size: 0.75rem; color: var(--dim); letter-spacing: 1px; }
+
+    /* STOCK PANEL */
+    .stock-panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        overflow: hidden;
+        animation: slideUp 0.35s cubic-bezier(0.16,1,0.3,1) both;
+    }
+    .stock-panel.panel-positive { border-top: 3px solid var(--green); }
+    .stock-panel.panel-negative { border-top: 3px solid var(--red); }
+    @@keyframes slideUp { from { opacity:0; transform: translateY(16px); } to { opacity:1; transform: translateY(0); } }
+
+    /* PANEL TOPBAR */
+    .panel-topbar {
+        display: flex; align-items: center; gap: 1rem;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--border);
+        background: rgba(0,0,0,0.2);
+    }
+    .panel-ticker { font-family: var(--font-disp); font-size: 2rem; letter-spacing: 4px; color: var(--amber); }
+    .panel-company { flex: 1; font-size: 0.8rem; color: var(--text); letter-spacing: 1px; }
+    .panel-updated { font-size: 0.6rem; color: var(--dim); letter-spacing: 1px; }
+
+    /* PRICE HERO */
+    .price-hero {
+        display: flex; align-items: baseline; gap: 2rem;
+        padding: 1.5rem 1.5rem 1rem;
+    }
+    .price-main { display: flex; align-items: baseline; gap: 0.5rem; }
+    .price-currency { font-size: 0.85rem; color: var(--dim); letter-spacing: 2px; align-self: center; }
+    .price-value { font-family: var(--font-disp); font-size: 3.5rem; letter-spacing: 2px; color: #fff; line-height: 1; }
+    .price-change {
+        display: flex; align-items: center; gap: 0.4rem;
+        font-size: 0.9rem; font-weight: 600; letter-spacing: 1px;
+    }
+    .change-pct { font-size: 0.8rem; opacity: 0.8; }
+    .change-label { font-size: 0.6rem; letter-spacing: 2px; color: var(--dim); font-weight: 400; }
+    .positive { color: var(--green); }
+    .negative { color: var(--red); }
+
+    /* RANGE */
+    .range-section { padding: 0 1.5rem 1.5rem; }
+    .range-labels {
+        display: flex; justify-content: space-between;
+        font-size: 0.65rem; letter-spacing: 1px; color: var(--dim);
+        margin-bottom: 0.5rem;
+    }
+    .range-title { color: var(--muted); }
+    .range-track {
+        height: 6px; background: var(--border); border-radius: 3px;
+        position: relative; overflow: visible;
+    }
+    .range-fill {
+        height: 100%; border-radius: 3px;
+        background: linear-gradient(90deg, var(--red), var(--amber), var(--green));
+        max-width: 100%;
+    }
+    .range-cursor {
+        position: absolute; top: 50%; transform: translateY(-50%);
+        width: 12px; height: 12px; border-radius: 50%;
+        background: #fff; border: 2px solid var(--amber);
+        box-shadow: 0 0 8px rgba(240,165,0,0.6);
+    }
+
+    /* STATS GRID */
+    .stats-grid {
+        display: grid; grid-template-columns: repeat(3,1fr);
+        border-top: 1px solid var(--border);
+    }
+    .stat-block {
+        padding: 1.25rem 1.5rem;
+        border-right: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+    }
+    .stat-block:nth-child(3n) { border-right: none; }
+    .stat-label { font-size: 0.6rem; letter-spacing: 3px; color: var(--dim); margin-bottom: 0.4rem; }
+    .stat-value { font-size: 1.1rem; font-weight: 600; color: var(--text); }
+    .stat-value.dim { color: var(--muted); }
+
+    /* CHART */
+    .chart-section { padding: 1.25rem 1.5rem 1.5rem; border-top: 1px solid var(--border); }
+    .chart-label { font-size: 0.6rem; letter-spacing: 3px; color: var(--dim); margin-bottom: 0.75rem; }
+    .chart-wrap { position: relative; }
+    .spark-chart { width: 100%; height: 120px; display: block; }
+    .chart-axis {
+        display: flex; justify-content: space-between;
+        font-size: 0.6rem; color: var(--muted); letter-spacing: 1px; margin-top: 0.4rem;
+    }
+
+    /* FOOTER */
+    .dashboard-footer {
+        text-align: center; padding: 1.25rem;
+        border-top: 1px solid var(--border);
+        font-size: 0.6rem; letter-spacing: 3px; color: var(--muted);
+        display: flex; justify-content: center; gap: 1rem;
+        margin-top: 2rem;
+    }
+    .footer-sep { color: var(--border); }
+
+    /* RESPONSIVE */
+    @@media (max-width: 600px) {
+        .main-content { padding: 1.5rem 1rem; }
+        .price-value { font-size: 2.5rem; }
+        .stats-grid { grid-template-columns: repeat(2,1fr); }
+        .stat-block:nth-child(3n) { border-right: 1px solid var(--border); }
+        .stat-block:nth-child(2n) { border-right: none; }
+        .price-hero { flex-direction: column; gap: 0.5rem; }
+        .empty-grid { grid-template-columns: repeat(2,1fr); }
+    }
+</style>
+
+<script>
+    function updateClock() {
+        const el = document.getElementById('clock');
+        if (el) {
+            const now = new Date();
+            el.textContent = now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12: false});
+        }
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+</script>
+
+@code {
+    private string ticker = string.Empty;
+    private Stock? stock = null;
+    private bool isLoading = false;
+    private string? errorMessage = null;
+
+    private async Task SearchStock()
+    {
+        if (string.IsNullOrWhiteSpace(ticker)) return;
+        isLoading = true;
+        errorMessage = null;
+        stock = null;
+        try
+        {
+            stock = await Http.GetFromJsonAsync<Stock>($"api/stocks/{ticker.ToUpper()}");
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = $"Could not find data for '{ticker.ToUpper()}'. Check the ticker and try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await SearchStock();
+    }
+
+    private string FormatVolume(double volume)
+    {
+        if (volume >= 1_000_000_000) return $"{volume / 1_000_000_000.0:F2}B";
+        if (volume >= 1_000_000) return $"{volume / 1_000_000.0:F2}M";
+        if (volume >= 1_000) return $"{volume / 1_000.0:F1}K";
+        return volume.ToString("N0");
+    }
+
+    private (string linePath, string areaPath) GenerateSparkPath(Stock s, bool isPositive)
+    {
+        // Generates a plausible intraday path based on open/current/high/low
+        var rng = new Random(s.Ticker.GetHashCode());
+        int points = 60;
+        double w = 600.0;
+        double h = 120.0;
+        double padding = 10.0;
+
+        double open = (double)s.OpenPrice;
+        double close = (double)s.CurrentPrice;
+        double high = (double)s.HighPrice;
+        double low = (double)s.LowPrice;
+        double range = high - low;
+        if (range == 0) range = 1;
+
+        var prices = new double[points];
+        prices[0] = open;
+        prices[points - 1] = close;
+
+        double midHigh = high * 0.85 + open * 0.15;
+        double midLow  = low  * 0.85 + open * 0.15;
+        double mid = isPositive ? midHigh : midLow;
+
+        for (int i = 1; i < points - 1; i++)
+        {
+            double t = i / (double)(points - 1);
+            double trend = open + (close - open) * t;
+            double bulge = Math.Sin(t * Math.PI) * (mid - open) * (1 + rng.NextDouble() * 0.4 - 0.2);
+            double noise = (rng.NextDouble() - 0.5) * range * 0.08;
+            prices[i] = trend + bulge + noise;
+            prices[i] = Math.Clamp(prices[i], low, high);
+        }
+
+        // Map to SVG coords
+        string ToX(int i) => (i / (double)(points - 1) * w).ToString("F1");
+        string ToY(double p) => (h - padding - (p - low) / range * (h - 2 * padding)).ToString("F1");
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"M {ToX(0)} {ToY(prices[0])}");
+        for (int i = 1; i < points; i++)
+            sb.Append($" L {ToX(i)} {ToY(prices[i])}");
+        string line = sb.ToString();
+
+        string area = line + $" L {w} {h} L 0 {h} Z";
+        return (line, area);
+    }
+}

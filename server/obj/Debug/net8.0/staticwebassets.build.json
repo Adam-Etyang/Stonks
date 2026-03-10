@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "sSsLZYcdFjCPSvYd98ykHpV8lXdGBTUc3dJ726k4BI0=",
+  "Source": "stonks",
+  "BasePath": "_content/stonks",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
